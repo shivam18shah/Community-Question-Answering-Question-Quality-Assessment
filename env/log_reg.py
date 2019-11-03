@@ -27,7 +27,7 @@ def log_reg():
     # coeffs = log_reg.coef_
 
     # with cross validation
-    evals = cross_validate(log_reg, train_df, test_df, cv=3)
+    evals = cross_validate(log_reg, X_df, y_df, cv=3)
     print(evals)
     pickle.dump(coeffs, OUTPUT_FILE)
 

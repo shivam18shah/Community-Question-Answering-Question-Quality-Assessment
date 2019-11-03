@@ -9,8 +9,8 @@ CSV_FILE = 'StackOverflowData.csv'
 
 df = pd.read_csv(CSV_FILE)
 print(df.head())
-train_df = df.loc[:-1]
-test_df = df.loc[-1]
+train_df = df.iloc[:,:-1]
+test_df = df.iloc[:,-1]
 
 X_train, X_test, y_train, y_test = train_test_split(train_df, test_df, test_size=0.3, random_state=10))
 

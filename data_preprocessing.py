@@ -1,38 +1,94 @@
+import numpy as np
 import pandas as pd
 import os
 import xml.etree.ElementTree as et
+
 from config import args
+from google.cloud import bigquery
 
 
-def get_dataset(filepath: str, force_update: bool = False, debug: bool = False) -> object:
+def get_dataset(filepath: str, force_update: bool = False, debug: bool = False) -> type(pd.DataFrame()):
     """
+
     :param filepath: The filepath where the csv dataset is stored
     :param force_update: Forcefully get a new processed dataset
     :param debug: Print debug statements
-
-    :return: A pandas dataframe containing the dataset
+    :return: Pandas dataframe containing the dataset
     """
     if (not os.path.exists(filepath)) or force_update:
-        build_dataset(filepath, debug)
+        df = build_dataset_xml(debug)
+
+        if debug:
+            print("Saving Dataset")
+        df.to_csv(filepath)
+        return df
 
     if debug:
         print("Reading Dataset")
 
-    return pd.read_csv(filepath)
+    df = pd.read_csv(filepath)
+    df = typecast_dataset(df,debug)
+    return df
 
 
-def build_dataset(filepath: str, debug: bool = False) -> None:
+def build_dataset_bigquery(debug: bool = False) -> type(pd.DataFrame()):
     """
-    :param filepath: The file path where the csv file should be saved
+
     :param debug: Print debug statements
-
-    :return: Nothing
+    :return: pandas Dataframe containing the dataset
     """
-    xtree = et.parse(os.path.join(args.dataset, "Posts.xml"))
+
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./CQA System-9eecfbe53496.json"
+
+    client = bigquery.Client()
+    query = """
+        SELECT id,accepted_answer_id,score,view_count,body,title,tags,answer_count,comment_count,favorite_count,closed_date
+        FROM `bigquery-public-data.stackoverflow.posts_questions` 
+        WHERE EXTRACT(YEAR FROM creation_date)=2018
+            AND EXTRACT(MONTH FROM creation_date)>=10
+            AND EXTRACT(MONTH FROM creation_date)<=12
+            AND last_edit_date IS NULL
+            AND view_count > 0
+    """
+
+    if debug:
+        print("Firing Query")
+
+    out_df = client.query(query).result().to_dataframe()
+
+    if debug:
+        print("Dataset Obtained")
+
+    out_df.rename(columns={
+        'id' : 'Id',
+        'accepted_answer_id' : 'AcceptedAnswerId',
+        'score' : 'Score',
+        'view_count' : 'ViewCount',
+        'body' : 'Body',
+        'title' : 'Title',
+        'tags' : 'Tags',
+        'answer_count' : 'AnswerCount',
+        'comment_count': 'CommentCount',
+        'favorite_count' : 'FavoriteCount',
+        'closed_date' : 'ClosedDate'
+    },inplace=True)
+
+    out_df = typecast_dataset(out_df, debug)
+    out_df = label_dataset(out_df, debug)
+    return out_df
+
+
+def build_dataset_xml(debug: bool = False) -> type(pd.DataFrame()):
+    """
+
+    :param debug: Print debug statements
+    :return: pandas Dataframe containing the dataset
+    """
+    xtree = et.parse(os.path.join(args.dataset, "xml" ,"Posts.xml"))
     xroot = xtree.getroot()
 
     df_cols = ['Id', 'PostTypeId', 'AcceptedAnswerId', 'CreationDate', 'Score', 'ViewCount',
-               'Body', 'Title', 'Tags', 'AnswerCount', 'CommentCount', 'FavoriteCount']
+               'Body', 'Title', 'Tags', 'AnswerCount', 'CommentCount', 'FavoriteCount','ClosedDate']
 
     rows = []
     if debug:
@@ -51,36 +107,115 @@ def build_dataset(filepath: str, debug: bool = False) -> None:
             'Tags': node.attrib.get('Tags'),
             'AnswerCount': node.attrib.get('AnswerCount'),
             'CommentCount': node.attrib.get('CommentCount'),
-            'FavoriteCount': node.attrib.get('FavoriteCount')
+            'FavoriteCount': node.attrib.get('FavoriteCount'),
+            'ClosedDate': node.attrib.get('ClosedDate')
         })
 
     out_df = pd.DataFrame(rows, columns=df_cols)
-
-    out_df['AnswerCount'] = out_df['AnswerCount'].replace([None], ['0'])
-    out_df['CommentCount'] = out_df['CommentCount'].replace([None], ['0'])
-    out_df['FavoriteCount'] = out_df['FavoriteCount'].replace([None], ['0'])
-    out_df['Score'] = out_df['Score'].replace([None], ['0'])
-    out_df['ViewCount'] = out_df['ViewCount'].replace([None], ['0'])
-
-    out_df = out_df.astype({
-        'Id': 'int32',
-        'PostTypeId': 'int32',
-        'Score': 'int32',
-        'ViewCount': 'int32',
-        'CreationDate': 'datetime64[ns]',
-        'AnswerCount': 'int32',
-        'CommentCount': 'int32',
-        'FavoriteCount': 'int32'
-    })
+    out_df = typecast_dataset(out_df, debug)
 
     if debug:
         print("Pruning Dataset")
 
     # Dataset Pruning
-    out_df = out_df[pd.notnull(out_df['Body'])]
-    out_df = out_df[out_df['PostTypeId'] == 1]
+    out_df = out_df[out_df['PostTypeId'] == '1']
+
+    out_df = out_df[['Id','AcceptedAnswerId','Score','ViewCount','Body','Title','Tags','AnswerCount','CommentCount','FavoriteCount','ClosedDate']]
+    out_df = label_dataset(out_df, debug)
+    return  out_df
+
+
+def build_dataset_combine(debug: bool = False) -> type(pd.DataFrame()):
+    """
+
+    :param debug: Print debug statements
+    :return: pandas Dataframe containing the dataset
+    """
+
+    """ STACK OVERFLOW QUERY
+    
+        WITH MyCTE AS(
+            SELECT ROW_NUMBER() OVER(ORDER BY Id ASC) AS RowNum, *
+            FROM POSTS
+            WHERE PostTypeId = 1 
+                AND CreationDate BETWEEN '10/01/2018 00:00:01' and '12/31/2018 23:59:59'
+                AND LastEditDate IS NULL
+                AND ViewCount > 0
+                AND DeletionDate IS NULL
+        )
+        SELECT Id,AcceptedAnswerId,Score,ViewCount,Body,Title,Tags,AnswerCount,CommentCount,FavoriteCount,ClosedDate
+        FROM MyCTE
+        WHERE RowNum >160000 AND RowNum <=200000
+    """
+
+    out_df = pd.DataFrame(columns=['Id','AcceptedAnswerId','Score','ViewCount','Body','Title','Tags','AnswerCount','CommentCount','FavoriteCount','ClosedDate'])
+
+    for i in range(1,6):
+        if debug:
+            print("Reading Query Result "+str(i))
+        temp_df = pd.read_csv(os.path.join(args.dataset, "combine" ,"QueryResults ("+str(i)+").csv"))
+        out_df = pd.concat([out_df, temp_df])
+
+    out_df = typecast_dataset(out_df, debug)
+    out_df = label_dataset(out_df, debug)
+
+    return out_df
+
+
+def typecast_dataset(df: type(pd.DataFrame()), debug: bool = False) -> type(pd.DataFrame()):
+    """
+
+    :param df:
+    :param debug: Print debug statements
+    :return: A typecasted Pandas Dataframe containing the dataset
+    """
+    df['AnswerCount'] = df['AnswerCount'].replace([None], ['0'])
+    df['CommentCount'] = df['CommentCount'].replace([None], ['0'])
+    df['FavoriteCount'] = df['FavoriteCount'].replace([None], ['0'])
+    df['Score'] = df['Score'].replace([None], ['0'])
+    df['ViewCount'] = df['ViewCount'].replace([None], ['0'])
+
+    return df.astype({
+        'Id': 'int64',
+        'Score': 'int32',
+        'ViewCount': 'int32',
+        'AnswerCount': 'int32',
+        'CommentCount': 'int32',
+        'FavoriteCount': 'int32',
+        'ClosedDate': 'datetime64[ns]'
+    })
+
+
+def label_dataset(df: type(pd.DataFrame()), debug: bool = False) -> type(pd.DataFrame()):
+    """
+
+    :param df: The CQA dataset to typecast
+    :param debug:
+    :return:
+    """
+    def calc_piscore(row):
+        return row['Score']/row['ViewCount'] if row['ViewCount'] != 0 else 0
 
     if debug:
-        print("Saving Dataset")
+        print("Calculating PI Score")
 
-    out_df.to_csv(filepath)
+    df['PI'] = df.apply(calc_piscore, axis=1)
+    avg_pi = df['PI'].mean()
+
+    def label(row):
+        if row['PI']>=avg_pi:
+            if pd.isnull(row['AcceptedAnswerId']):
+                return 'Good'
+            else:
+                return 'Very Good'
+        else:
+            if pd.isnull(row['ClosedDate']):
+                return 'Bad'
+            else:
+                return 'Very Bad'
+    if debug:
+        print("Labeling Quality")
+
+    df['Quality'] = df.apply(label, axis=1)
+
+    return df

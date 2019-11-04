@@ -17,20 +17,19 @@ def log_reg():
     X_df = df.iloc[:,:-1]
     y_df = df.iloc[:,-1]
 
-    log_reg = LogisticRegression()
+    log_reg = LogisticRegressionCV(cv=5, random_state=10).fit(X_df, y_df) #Cs=4, fit_intercept=True, cv=10, verbose =1, random_state=42)
 
-    # without cross validation, requires change in order
-    # X_train, X_test, y_train, y_test = train_test_split(X_df, y_df, test_size=0.3, random_state=10)
-    # log_reg.fit(X_train, y_train)
-    # pred = log_reg.predict(X_test)
-    # print(classification_report(y_test, pred))
-    # coeffs = log_reg.coef_
-
+    print(X_df.shape, y_df.shape)
     # with cross validation
-    evals = cross_validate(log_reg, X_df, y_df, cv=3)
+    evals = cross_validate(log_reg, X_df, y_df, cv=5)
     print(evals)
-    pickle.dump(coeffs, OUTPUT_FILE)
+    coeffs = log_reg.coef_
+    with open(OUTPUT_FILE, 'wb') as f:
+        pickle.dump(coeffs, f)
 
-if __name__==__main__:
+def main():
     if not os.path.exists(OUTPUT_FILE):
         log_reg()
+
+if __name__==__main__:
+    main()

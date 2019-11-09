@@ -7,6 +7,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 from sklearn import svm
 import os
+import time
 import pickle
 import warnings
 import random
@@ -29,6 +30,8 @@ def svm_reg():
     X_df = df.iloc[:,:-1]
     y_df = df.iloc[:,-1]
 
+    _ = input('Before you run, make sure that the previous execution models have been stored safely, as the files will be overwritten. Enter any input to continue, or terminate the execution and securely save the previous model: ')
+
     lsvm = svm.SVC(kernel='linear',C = 1.0, random_state=10).fit(X_df, y_df) #Cs=4, fit_intercept=True, cv=10, verbose =1, random_state=42)
     
     
@@ -37,14 +40,23 @@ def svm_reg():
     # with cross validation
     evals = cross_val_score(lsvm, X_df, y_df, cv=5)
     
-    #print(evals)
-    #coeffs = log_reg.coef_
-    #with open(OUTPUT_FILE, 'wb') as f:
-        #pickle.dump(coeffs, f)
+    coeffs = svm.coef_
+    scores = svm.scores_
+    print('Eval:', evals)
+    print('Coeffs: ', coeffs)
+    print('Scores: ', scores)
+    with open(OUTPUT_FILE, 'wb') as f:
+        pickle.dump(coeffs, f)
+    f.close()
+    with open(MODEL_FILE, 'wb') as f:
+        pickle.dump(svm, f)
+    f.close()
         
 
 def main():
+    start_time = time.time()
     svm_reg()
+    print("--- %s seconds ---" % (time.time() - start_time))
 
 if __name__=='__main__':
-    main() 
+    main()

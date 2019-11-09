@@ -44,8 +44,7 @@ def svm_reg():
         
 
 def main():
-    if not os.path.exists(OUTPUT_FILE):
-        svm_reg()
+    svm_reg()
 
 if __name__=='__main__':
     main() 

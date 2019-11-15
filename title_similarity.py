@@ -2,6 +2,7 @@ import numpy as np
 import os
 import nltk
 import math
+import pickle
 # nltk.download('punkt')
 from nltk import sent_tokenize, word_tokenize
 import time
@@ -11,6 +12,7 @@ GLOVE_FILE = os.path.join('dataset', 'glove.6B.100d.txt')
 # SIZE_OF_SENTENCE = 20
 # SIZE_OF_TITLE = 8
 GLOVE_SIZE = 100
+PICKLE_PATH = os.path.join('dataset', 'glove_100.pkl')
 
 def get_similarity(head, body, lim):
     # cosine is a naive choice, don't use it
@@ -40,19 +42,12 @@ def get_similarity(head, body, lim):
     # return np.sum(score)/SIZE_OF_SENTENCE
 
 
-def get_glove_model(GLOVE_FILE):
-    f = open(GLOVE_FILE, encoding="utf8")
-    model = dict()
-    print('Getting Glove Vectors ...')
-    for line in f:
-        shabdo = line.split(' ')
-        word = shabdo[0]
-        embedding = np.array([float(i) for i in shabdo[1:]])
-        model[word] = embedding
-    f.close()
+def get_glove_model(PICKLE_PATH):
+    with open(PICKLE_PATH, 'rb') as f:
+        model = pickle.load(f)
     return model
 
-def get_embeddings(title, question, GLOVE_WORDMAP = get_glove_model(GLOVE_FILE)):
+def get_embeddings(title, question, GLOVE_WORDMAP = get_glove_model(PICKLE_PATH)):
     t = word_tokenize(title)
     q = word_tokenize(question)
     vec = np.array([0]*GLOVE_SIZE)

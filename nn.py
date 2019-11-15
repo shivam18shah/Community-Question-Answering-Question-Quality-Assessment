@@ -12,8 +12,8 @@ warnings.filterwarnings('ignore')
 RANDOM_STATE = 10
 CSV_FILE = os.path.join('./dataset','train.csv')
 OUTPUT_FOLDER = './Outputs'
-OUTPUT_FILE = os.path.join(OUTPUT_FOLDER, 'svm_results.obj')
-MODEL_FILE = os.path.join(OUTPUT_FOLDER, 'svm_model.obj')
+OUTPUT_FILE = os.path.join(OUTPUT_FOLDER, 'nn_results.obj')
+MODEL_FILE = os.path.join(OUTPUT_FOLDER, 'nn_model.obj')
 
 
 def nn():
@@ -22,19 +22,19 @@ def nn():
     y_df = df.iloc[:,-1]
     _ = input('Before you run, make sure that the previous execution models have been stored safely, as the files will be overwritten. Enter any input to continue, or terminate the execution and securely save the previous model: ')
     NFEATURES = len(X_df.iloc[0])
-    nn = MLPClassifier(solver='adam', alpha='1e-4', hidden_layer_sizes=(NFEATURES, 2), random_state=RANDOM_STATE)
-    eval = cross_validate(nn, X_df, y_df, cv=4)
-    print(eval)
-    coeffs = nn.coef_
-    scores = nn.scores_
+    nn = MLPClassifier(solver='adam', alpha=0.01, hidden_layer_sizes=(NFEATURES, 5, 4), random_state=RANDOM_STATE)
+    evals = cross_validate(nn, X_df, y_df, cv=4, return_train_score=True)
+    print(evals)
+    # coeffs = nn.n_iters
+    # scores = nn.loss_
     print('Eval:', evals)
-    print('Coeffs: ', coeffs)
-    print('Scores: ', scores)
-    with open(OUTPUT_FILE, 'wb') as f:
-        pickle.dump(coeffs, f)
-    f.close()
+    # print('Coeffs: ', coeffs)
+    # print('Loss: ', scores)
+    # with open(OUTPUT_FILE, 'wb') as f:
+    #     pickle.dump(coeffs, f)
+    # f.close()
     with open(MODEL_FILE, 'wb') as f:
-        pickle.dump(log_reg, f)
+        pickle.dump(nn, f)
     f.close()
 
 

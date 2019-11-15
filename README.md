@@ -13,3 +13,8 @@ The data in read from dataset/train.csv, and the outputs are written into Output
   
 
 Before running the actual model on the dataset, the program will ask you for an input to make sure that you have securely saved the model from the previous execution, as the file will be overwritten. You can press enter and continue (blank input is fine, just press enter.) is you are ready to execute. Make sure to save the copy of the files after execution, and keep track of the cross validatoin accuracies along with them, as they are NOT saved anywhere.
+
+
+
+
+The title_similarity.py file is to be used for measuring similarity of the title to the question by passing each as a list. Return value will be a list of scores for corresponding titles and question bodies. Glove 100 dimension vectorization is used for mapping, and the similarity os measured by taking the best match for each word in the title to the question body.

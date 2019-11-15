@@ -1,4 +1,4 @@
-# CSE_575_SML
+# CSE_575_SML: Community Question Answering - Question Quality Assessment
 Final Project
 
 Sample execution query for terminal:
